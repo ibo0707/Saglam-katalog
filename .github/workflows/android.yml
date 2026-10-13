@@ -1,0 +1,50 @@
+name: Saglam Katalog APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '*.zip'
+      - '.github/workflows/android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Depoyu indir
+        uses: actions/checkout@v4
+
+      - name: Java kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK kur
+        uses: android-actions/setup-android@v3
+
+      - name: Android bileşenlerini yükle
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Gradle kur
+        run: |
+          curl -L https://services.gradle.org/distributions/gradle-8.9-bin.zip -o gradle.zip
+          unzip -q gradle.zip -d "$RUNNER_TEMP"
+
+      - name: Projeyi aç ve APK oluştur
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
+          test -n "$ZIP_FILE"
+          mkdir extracted
+          unzip -q "$ZIP_FILE" -d extracted
+          PROJECT_DIR=$(find extracted -type f -name settings.gradle -printf '%h\n' | head -n 1)
+          test -n "$PROJECT_DIR"
+          "$RUNNER_TEMP/gradle-8.9/bin/gradle" -p "$PROJECT_DIR" assembleDebug
+
+      - name: APK dosyasını hazırla
+        uses: actions/upload-artifact@v4
+        with:
+          name: Saglam-Katalog-APK
+          path: extracted/**/app/build/outputs/apk/debug/*.apk
+          
