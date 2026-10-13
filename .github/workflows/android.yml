@@ -1,10 +1,11 @@
+
 name: Saglam Katalog APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - '*.zip'
+      - '**.zip'
       - '.github/workflows/android.yml'
 
 jobs:
@@ -23,30 +24,38 @@ jobs:
 
       - name: Android SDK kur
         uses: android-actions/setup-android@v3
-        with:
-         packages: ''
 
       - name: Android bileşenlerini yükle
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: ZIP dosyasını bul ve aç
+        run: |
+          find . -type f -iname '*.zip'
+          ZIP_FILE=$(find . -type f -iname '*.zip' | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "HATA: Depoda ZIP dosyası bulunamadı."
+            exit 1
+          fi
+          mkdir extracted
+          unzip -q "$ZIP_FILE" -d extracted
+          find extracted -name settings.gradle -o -name settings.gradle.kts
 
       - name: Gradle kur
         run: |
           curl -L https://services.gradle.org/distributions/gradle-8.9-bin.zip -o gradle.zip
           unzip -q gradle.zip -d "$RUNNER_TEMP"
 
-      - name: Projeyi aç ve APK oluştur
+      - name: Projeyi derle
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
-          test -n "$ZIP_FILE"
-          mkdir extracted
-          unzip -q "$ZIP_FILE" -d extracted
-          PROJECT_DIR=$(find extracted -type f -name settings.gradle -printf '%h\n' | head -n 1)
-          test -n "$PROJECT_DIR"
+          PROJECT_DIR=$(find extracted -type f \( -name settings.gradle -o -name settings.gradle.kts \) -printf '%h\n' | head -n 1)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "HATA: ZIP içinde Android projesi bulunamadı."
+            exit 1
+          fi
           "$RUNNER_TEMP/gradle-8.9/bin/gradle" -p "$PROJECT_DIR" assembleDebug
 
-      - name: APK dosyasını hazırla
+      - name: APK dosyasını yükle
         uses: actions/upload-artifact@v4
         with:
           name: Saglam-Katalog-APK
           path: extracted/**/app/build/outputs/apk/debug/*.apk
-          
